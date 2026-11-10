@@ -1,0 +1,17 @@
+[DataContractAttribute, SysOperationContractProcessingAttribute(classStr(TMK_CashierAccessPermissionsUIBuilder))]
+class TMK_CashierAccessPermissionsContract
+{
+    List        posPermissionGroups;
+    [
+        DataMemberAttribute("PosPermissionGroups"),
+        AifCollectionTypeAttribute("PosPermissionGroups", Types::String),
+        SysOperationLabelAttribute(literalStr("Pos Permission")),
+        SysOperationDisplayOrderAttribute("1")
+    ]
+    public List parmPosPermissionGroups(List _posPermissionGroups = posPermissionGroups)
+    {
+        posPermissionGroups = _posPermissionGroups;
+        return posPermissionGroups;
+    }
+
+}
