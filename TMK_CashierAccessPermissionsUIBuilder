@@ -1,0 +1,28 @@
+public class TMK_CashierAccessPermissionsUIBuilder extends SrsReportDataContractUIBuilder
+{
+    /// <summary>
+    /// Supplies the POS permission groups to the framework's multi-select control.
+    /// The framework registers the lookup itself for List members, so no lookup override is registered here.
+    /// </summary>
+    protected SysOperationMultiSelectTmp getMultiSelectTableForType(SysDictType _dictType, SysOperationDataMemberInfo _memberInfo)
+    {
+        SysOperationMultiSelectTmp  multiSelectTmp;
+        RetailPosPermissionGroup    permissionGroup;
+
+        if (_memberInfo.parmPropertyName() != methodStr(TMK_CashierAccessPermissionsContract, parmPosPermissionGroups))
+        {
+            return super(_dictType, _memberInfo);
+        }
+
+        while select PosPermissionGroupId from permissionGroup
+            order by PosPermissionGroupId
+        {
+            multiSelectTmp.clear();
+            multiSelectTmp.Values = permissionGroup.PosPermissionGroupId;
+            multiSelectTmp.insert();
+        }
+
+        return multiSelectTmp;
+    }
+
+}
