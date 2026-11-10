@@ -1,0 +1,138 @@
+[
+    SRSReportQueryAttribute(queryStr(TMK_CashierAccessPermissionsQry)),
+    SRSReportParameterAttribute(classStr(TMK_CashierAccessPermissionsContract))
+]
+class TMK_CashierAccessPermissionsDP extends SrsReportDataProviderPreProcessTempDB
+{
+    TMK_CashierAccessPermissionsTmp tmpTable;
+    Set                             selectedGroups;
+
+    #define.Separator(';')
+    [
+        SRSReportDataSet(tableStr(TMK_CashierAccessPermissionsTmp))
+    ]
+    public TMK_CashierAccessPermissionsTmp getTMK_CashierAccessPermissionsTmp()
+    {
+        select tmpTable;
+        return tmpTable;
+    }
+
+    public void processReport()
+    {
+        TMK_CashierAccessPermissionsContract    contract    = this.parmDataContract() as TMK_CashierAccessPermissionsContract;
+        List                                    groupList   = contract.parmPosPermissionGroups();
+        CompanyName                             companyName = CompanyInfo::find().Name;
+        Set                                     processedWorkers = new Set(Types::Int64);
+        QueryRun                                queryRun;
+        HcmWorker                               hcmWorker;
+        DirPerson                               dirPerson;
+        DirPartyTable                           dirParty;
+        str                                     groups;
+        ListEnumerator                          groupEnumerator;
+
+        selectedGroups = new Set(Types::String);
+        if (groupList)
+        {
+            groupEnumerator = groupList.getEnumerator();
+            while (groupEnumerator.moveNext())
+            {
+                if (groupEnumerator.current())
+                {
+                    selectedGroups.add(groupEnumerator.current());
+                }
+            }
+        }
+
+        queryRun = new QueryRun(this.parmQuery());
+        while (queryRun.next())
+        {
+            hcmWorker = queryRun.get(tableNum(HcmWorker));
+
+            if (processedWorkers.in(hcmWorker.RecId))
+            {
+                continue;
+            }
+            processedWorkers.add(hcmWorker.RecId);
+
+            // Only workers holding a position with a POS permission group (matching the selection) are reported
+            groups = this.posPermissionGroups(hcmWorker.RecId);
+            if (!groups)
+            {
+                continue;
+            }
+
+            dirPerson = DirPerson::find(hcmWorker.Person);
+            dirParty  = DirPartyTable::findRec(dirPerson.RecId);
+            FieldId    arabicNameId = fieldName2Id(tableNum(DirPartyTable),'NameAr');
+            
+            tmpTable.clear();
+            tmpTable.PersonnelNumber     = hcmWorker.PersonnelNumber;
+            tmpTable.WorkerName          = dirPerson.Name;
+            tmpTable.ArabicName          = dirParty.(arabicNameId);
+            tmpTable.AddressBooks        = this.addressBooks(hcmWorker.Person);
+            tmpTable.PosPermissionGroups = groups;
+            tmpTable.CompanyName         = companyName;
+            tmpTable.insert();
+        }
+    }
+
+    /// <summary>
+    /// Returns the distinct POS permission groups of the worker's currently assigned positions.
+    /// Returns an empty string when the worker has none, or none of them is in the selected groups.
+    /// </summary>
+    private str posPermissionGroups(HcmWorkerRecId _worker)
+    {
+        HcmPositionWorkerAssignment positionAssignment;
+        RetailPositionPosPermission positionPermission;
+        RetailPosPermissionGroup    permissionGroup;
+        Set                         groupSet = new Set(Types::String);
+        boolean                     matchesSelection = !selectedGroups.elements();
+        str                         result;
+
+        while select Position from positionAssignment
+            where positionAssignment.Worker == _worker
+            join PosPermissionGroup from positionPermission
+                where positionPermission.Position == positionAssignment.Position
+            join PosPermissionGroupId from permissionGroup
+                order by PosPermissionGroupId
+                where permissionGroup.RecId == positionPermission.PosPermissionGroup
+        {
+            if (groupSet.in(permissionGroup.PosPermissionGroupId))
+            {
+                continue;
+            }
+            groupSet.add(permissionGroup.PosPermissionGroupId);
+
+            if (selectedGroups.in(permissionGroup.PosPermissionGroupId))
+            {
+                matchesSelection = true;
+            }
+
+            result += (result ? #Separator : '') + permissionGroup.PosPermissionGroupId;
+        }
+
+        return matchesSelection ? result : '';
+    }
+
+    /// <summary>
+    /// Returns the address books (stores) the worker's party is assigned to, separated by semicolons.
+    /// </summary>
+    private str addressBooks(DirPartyRecId _party)
+    {
+        DirAddressBookParty addressBookParty;
+        DirAddressBook      addressBook;
+        str                 result;
+
+        while select AddressBook from addressBookParty
+            where addressBookParty.Party == _party
+            join Name, Description from addressBook
+                order by Name
+                where addressBook.RecId == addressBookParty.AddressBook
+        {
+            result += (result ? #Separator : '') + (addressBook.Description ? addressBook.Description : addressBook.Name);
+        }
+
+        return result;
+    }
+
+}
