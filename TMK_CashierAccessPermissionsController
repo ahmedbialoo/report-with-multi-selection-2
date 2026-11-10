@@ -1,0 +1,13 @@
+class TMK_CashierAccessPermissionsController extends SrsReportRunController
+{
+    public static void main(Args _args)
+    {
+        TMK_CashierAccessPermissionsController controller = new TMK_CashierAccessPermissionsController();
+
+        controller.parmReportName(ssrsReportStr(TMK_CashierAccessPermissionsReport, Report));
+        controller.parmDialogCaption("Cashier Access & Permissions Report");
+        controller.parmArgs(_args);
+        controller.startOperation();
+    }
+
+}
